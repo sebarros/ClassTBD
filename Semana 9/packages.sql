@@ -1,0 +1,61 @@
+-- Validacion previa
+-- Ver si quedan entradas (obtener stock de entradas) > 0 vendo, ! no puedo vender
+
+-- Tener una funcion que me devuelva la cantidad de entradas de una funcion en concreto ()
+
+-- Ahora que ya tengo la localidad y ademas tengo el stock de entradas procedo a vender
+-- Descontar el stock: (UPDATE STOCK_DISPONIBLE = STOCK_DISPONIBLE - ENTRADAS_COMPRADAS)
+
+-- 1) Determinar el SPEC
+CREATE OR REPLACE PACKAGE PKG_BOLETERIA
+IS
+    G_TOTAL_ENTRADAS_VENDIDAS NUMBER := 0;
+    -- El spec (o la firma) de mi funcion
+    FUNCTION FN_VERIFICAR_STOCK(P_LOCALIDAD_EVENTO_ID IN NUMBER) RETURN NUMBER;
+
+    PROCEDURE SP_ACTUALIZAR_STOCK(P_LOCALIDAD_EVENTO_ID IN NUMBER, P_ENTRADAS_VENDIDAS IN NUMBER);
+END PKG_BOLETERIA;
+/
+
+-- 2) Una vez declarado el spec vamos con el BODY
+CREATE OR REPLACE PACKAGE BODY PKG_BOLETERIA IS
+    -- Declarando el body de mi funcion. Es decir la logica
+    FUNCTION FN_VERIFICAR_STOCK(P_LOCALIDAD_EVENTO_ID IN NUMBER) RETURN NUMBER
+    AS
+        V_STOCK NUMBER;
+    BEGIN
+        SELECT STOCK_DISPONIBLE
+        INTO V_STOCK
+        FROM LOCALIDAD_EVENTO
+        WHERE LOCALIDAD_EVENTO_ID = P_LOCALIDAD_EVENTO_ID;
+
+        RETURN V_STOCK;
+    END FN_VERIFICAR_STOCK;
+
+    -- Declarar el body de mi procedure
+    PROCEDURE SP_ACTUALIZAR_STOCK(P_LOCALIDAD_EVENTO_ID IN NUMBER, P_ENTRADAS_VENDIDAS IN NUMBER)
+    AS
+        V_STOCK NUMBER;
+    BEGIN
+        V_STOCK:= FN_VERIFICAR_STOCK(P_LOCALIDAD_EVENTO_ID);
+        IF V_STOCK <= 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Sin entradas disponibles para el evento solicitadoS');
+        END IF;
+        UPDATE LOCALIDAD_EVENTO
+        SET STOCK_DISPONIBLE = STOCK_DISPONIBLE - P_ENTRADAS_VENDIDAS
+        WHERE LOCALIDAD_EVENTO_ID = P_LOCALIDAD_EVENTO_ID;
+        COMMIT;
+
+        G_TOTAL_ENTRADAS_VENDIDAS:= G_TOTAL_ENTRADAS_VENDIDAS + P_ENTRADAS_VENDIDAS;
+    END SP_ACTUALIZAR_STOCK;
+END PKG_BOLETERIA;
+/
+
+DECLARE
+    V_STOCK_DISPONIBLE NUMBER;
+BEGIN
+    V_STOCK_DISPONIBLE:= PKG_BOLETERIA.FN_VERIFICAR_STOCK(1);
+    PKG_BOLETERIA.SP_ACTUALIZAR_STOCK(1, 2);
+    DBMS_OUTPUT.PUT_LINE('El stock es: '||V_STOCK_DISPONIBLE);
+    DBMS_OUTPUT.PUT_LINE('El total de entradas vendidas es: '||PKG_BOLETERIA.G_TOTAL_ENTRADAS_VENDIDAS);
+END;
